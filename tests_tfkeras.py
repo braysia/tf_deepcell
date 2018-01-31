@@ -1,7 +1,7 @@
-# coding: utf-8
+import numpy as np
+
 import matplotlib.pyplot as plt
 from tensorflow.contrib.keras.python.keras.datasets import mnist
-
 
 from tensorflow.contrib.keras.python.keras.models import Sequential, Model
 from tensorflow.contrib.keras.python.keras.layers import Dense, Dropout, Activation, Flatten
@@ -16,14 +16,9 @@ from tensorflow.contrib.keras import metrics
 from tensorflow.contrib.keras import preprocessing
 
 
-# MNISTデータのダウンロード
-# x_train, x_test: shape (num_samples, 28, 28) の白黒画像データのuint8配列．
-# train, y_test: shape (num_samples,) のカテゴリラベル(0-9のinteger)のuint8配列．
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
-# 成形(3次元→4次元)
 x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], x_train.shape[2], 1)
 x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], x_test.shape[2], 1)
-# 正規化
 x_train = x_train.astype('float32') / 255
 x_test = x_test.astype('float32') / 255
 
@@ -32,7 +27,6 @@ print('y_train.shape:', y_train.shape)
 print('x_test.shape:', x_test.shape)
 print('y_test.shape:', y_test.shape)
 
-# モデルの定義
 model = Sequential([
     Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)),
     MaxPooling2D(),
@@ -44,17 +38,14 @@ model = Sequential([
     Dense(10, activation='softmax'),
 ])
 
-# モデルの要約を出力
 model.summary()
 
-# 最適化手法の設定
 opt = optimizers.Adam()
-model.compile(optimizer = opt,                          # 最適化手法
-              loss = 'sparse_categorical_crossentropy', # 損失関数
-              metrics = ['accuracy'])                   # 評価関数
+model.compile(optimizer = opt,
+              loss = 'sparse_categorical_crossentropy',
+              metrics = ['accuracy'])
 
 csv_logger = callbacks.CSVLogger('training.log')
-# 学習
 ####-------------
 datagen = preprocessing.image.ImageDataGenerator(rotation_range=90, shear_range=0, 
                                                  horizontal_flip=True, vertical_flip=True)
@@ -70,12 +61,10 @@ model.fit_generator(datagen.flow(x_train, y_train, batch_size=100),
 #                     batch_size=100, 
 #                     validation_data=(x_test, y_test), 
 #                     callbacks=[csv_logger])
-# 評価
 score = model.evaluate(x_test, y_test, batch_size=32)
 
 print('score[loss, accuracy]:', score)
 
-#Accuracyの推移
 plt.plot(history.history['acc'])
 plt.plot(history.history['val_acc'])
 plt.title('model accuracy')
@@ -85,7 +74,6 @@ plt.legend(['train', 'test'], loc='upper left')
 plt.savefig('accuracy.png')
 plt.close()
 
-# Lossの推移
 plt.plot(history.history['loss'])
 plt.plot(history.history['val_loss'])
 plt.title('model loss')
