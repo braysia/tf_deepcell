@@ -1,6 +1,4 @@
 import numpy as np
-
-import matplotlib.pyplot as plt
 from tensorflow.contrib.keras.python.keras.datasets import mnist
 
 from tensorflow.contrib.keras.python.keras.models import Sequential, Model
@@ -65,19 +63,22 @@ score = model.evaluate(x_test, y_test, batch_size=32)
 
 print('score[loss, accuracy]:', score)
 
-plt.plot(history.history['acc'])
-plt.plot(history.history['val_acc'])
-plt.title('model accuracy')
-plt.ylabel('accuracy')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
-plt.savefig('accuracy.png')
-plt.close()
+rec = dict(acc=history.history['acc'], val_acc=history.history['val_acc']
+           loss=history.history['loss'], val_loss=history.history['val_loss'])
 
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
-plt.title('model loss')
-plt.ylabel('loss')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
-plt.savefig('loss.png')
+# plt.plot(history.history['acc'])
+# plt.plot(history.history['val_acc'])
+# plt.title('model accuracy')
+# plt.ylabel('accuracy')
+# plt.xlabel('epoch')
+# plt.legend(['train', 'test'], loc='upper left')
+# plt.savefig('accuracy.png')
+# plt.close()
+
+# plt.plot(history.history['loss'])
+# plt.plot(history.history['val_loss'])
+# plt.title('model loss')
+# plt.ylabel('loss')
+# plt.xlabel('epoch')
+# plt.legend(['train', 'test'], loc='upper left')
+# plt.savefig('loss.png')
