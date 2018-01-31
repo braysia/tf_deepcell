@@ -47,11 +47,11 @@ csv_logger = callbacks.CSVLogger('training.log')
 ####-------------
 datagen = preprocessing.image.ImageDataGenerator(rotation_range=90, shear_range=0, 
                                                  horizontal_flip=True, vertical_flip=True)
-model.fit_generator(datagen.flow(x_train, y_train, batch_size=100),
-                    steps_per_epoch=len(y_train),  # FIXME
-                    epochs=10,
-                    validation_data=(x_test, y_test), 
-                    callbacks=[csv_logger])
+history = model.fit_generator(datagen.flow(x_train, y_train, batch_size=100),
+                              steps_per_epoch=len(y_train),  # FIXME
+                              epochs=10,
+                              validation_data=(x_test, y_test), 
+                              callbacks=[csv_logger])
 ####-------------
 
 # history = model.fit(x_train, y_train, 
@@ -63,9 +63,9 @@ score = model.evaluate(x_test, y_test, batch_size=32)
 
 print('score[loss, accuracy]:', score)
 
-rec = dict(acc=history.history['acc'], val_acc=history.history['val_acc']
+rec = dict(acc=history.history['acc'], val_acc=history.history['val_acc'],
            loss=history.history['loss'], val_loss=history.history['val_loss'])
-
+np.savez('output.npz', **rec)
 # plt.plot(history.history['acc'])
 # plt.plot(history.history['val_acc'])
 # plt.title('model accuracy')
