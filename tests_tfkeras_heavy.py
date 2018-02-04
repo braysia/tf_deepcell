@@ -11,6 +11,25 @@ from tensorflow.contrib.keras import preprocessing
 from scipy.ndimage import imread
 from patches import extract_patches
 
+
+from tensorflow.contrib.keras.python.keras.engine.topology import Layer
+from tensorflow.contrib.keras.python.keras import backend
+
+
+class Squeeze(Layer):
+    def __init__(self, output_dim, **kwargs):
+        self.output_dim = output_dim
+        super(Squeeze, self).__init__(**kwargs)
+
+    def call(self, x):
+        x = backend.squeeze(x, axis=2)
+        return backend.squeeze(x, axis=1)
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], input_shape[3])
+
+
+
 x = imread('tests/nuc0/nuclear.png')
 y = np.zeros(x.shape)
 y0 = imread('tests/nuc0/feature_0.png').astype(bool)
@@ -33,11 +52,15 @@ y_test = y_all[-int(nsamples * frac_test):]
 x_train = np.expand_dims(x_train, -1)
 x_test = np.expand_dims(x_test, -1)
 
+
 model = Sequential([
+    # 61 x 61
     Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=(61, 61, 1)),
     BatchNormalization(),
+    # 64 x 61 x 61
     Conv2D(64, kernel_size=(4, 4), activation='relu'),
     MaxPooling2D(),
+    # 64 x 30 x 30
     Conv2D(64, kernel_size=(3, 3), activation='relu'),
     Conv2D(64, kernel_size=(3, 3), activation='relu'),
     MaxPooling2D(),
@@ -45,9 +68,9 @@ model = Sequential([
     Conv2D(64, kernel_size=(3, 3), activation='relu'),
     MaxPooling2D(),
     Conv2D(200, kernel_size=(4, 4), activation='relu'),
-    Flatten(),
-    Dense(200, activation='relu'),
-    Dense(3, activation='softmax'),
+    Conv2D(200, kernel_size=(1, 1), activation='relu'),
+    Conv2D(3, kernel_size=(1, 1), activation='softmax'),
+    Squeeze(3)
 ])
 
 model.summary()
