@@ -21,7 +21,9 @@ class Squeeze(Layer):
         return (input_shape[0], input_shape[3])
 
 
-def convert_model_patch2full(model, shape):
+def convert_model_patch2full(model):
+    """
+    """
     dr = 1
     new_model = Sequential()
     for nl, layer in enumerate(model.layers):
@@ -36,14 +38,8 @@ def convert_model_patch2full(model, shape):
             continue
         if isinstance(layer, Conv2D):
             if not layer.kernel_size == (1, 1):
-                if nl == 0:
-                    newl = Conv2D(layer.filters, layer.kernel_size, input_shape=shape)
-                    newl = newl.from_config(layer.get_config())
-                    newl.dilation_rate = (dr, dr)
-                    new_model.add(newl)
-                if not nl == 0:
-                    layer.dilation_rate = (dr, dr)
-                    new_model.add(layer)
+                layer.dilation_rate = (dr, dr)
+                new_model.add(layer)
             else:
                 newl = Conv2D(layer.filters, layer.kernel_size, input_shape=layer.input_shape[1:])
                 new_model.add(newl.from_config(layer.get_config()))
@@ -54,5 +50,12 @@ def convert_model_patch2full(model, shape):
 
 def load_model_py(path):
     fname = os.path.basename(path).split('.')[0]
-    module = imp.load_source('tests_model', path)
+    module = imp.load_source(fname, path)
     return module.model
+
+
+def make_outputdir(output):
+    try:
+        os.makedirs(output)
+    except:
+        pass
