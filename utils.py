@@ -4,9 +4,8 @@ import imp
 from tensorflow.contrib.keras.python.keras.engine.topology import Layer
 from tensorflow.contrib.keras.python.keras import backend
 from tensorflow.contrib.keras.python.keras.layers import Conv2D, MaxPooling2D
-from _dc_custom_layers import dilated_MaxPool2D
 from tensorflow.contrib.keras.python.keras.models import Sequential
-
+from _dilated_pool import DilatedMaxPool2D
 
 class Squeeze(Layer):
     def __init__(self, output_dim, **kwargs):
@@ -30,7 +29,7 @@ def convert_model_patch2full(model):
         if isinstance(layer, Squeeze):
             continue
         if isinstance(layer, MaxPooling2D):
-            newl = dilated_MaxPool2D(dilation_rate=dr)
+            newl = DilatedMaxPool2D(dilation_rate=dr)
             newl = newl.from_config(layer.get_config())
             newl.strides, newl.dilation_rate = (1, 1), dr
             new_model.add(newl)
