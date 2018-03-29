@@ -8,7 +8,7 @@ from tensorflow.contrib.keras.python.keras.models import Sequential
 from _dilated_pool import DilatedMaxPool2D
 
 class Squeeze(Layer):
-    def __init__(self, output_dim, **kwargs):
+    def __init__(self, output_dim=None, **kwargs):
         self.output_dim = output_dim
         super(Squeeze, self).__init__(**kwargs)
 
@@ -18,6 +18,12 @@ class Squeeze(Layer):
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[3])
+
+    # def get_config(self):
+    #     config = {'output_dim': self.output_dim}
+    #     base_config = super(Squeeze, self).get_config()
+    #     return dict(list(base_config.items()) + list(config.items()))
+
 
 
 def convert_model_patch2full(model):
