@@ -49,10 +49,11 @@ def train(image_path, labels_path, model_path, output, patchsize=61, nsamples=10
     datagen = ImageDataGenerator(rotation_range=90, shear_range=0, 
                                  horizontal_flip=True, vertical_flip=True)
 
-    history = model.fit_generator(datagen.flow(x_train, y_train, batch_size=batch_size),
-                                  steps_per_epoch=len(y_train),
+    history = model.fit_generator(datagen.flow(x_train, y_train, batch_size=batch_size, shuffle=True),
+                                  steps_per_epoch=len(y_train)/batch_size,
                                   epochs=nepochs,
                                   validation_data=(x_test, y_test),
+                                  validation_steps=len(y_train)/batch_size,
                                   callbacks=callbacksets)
     score = model.evaluate(x_test, y_test, batch_size=batch_size)
     print('score[loss, accuracy]:', score)
@@ -74,7 +75,7 @@ def _parse_command_line_args():
     parser.add_argument('-l', '--labels', help='labels file path')
     parser.add_argument('-m', '--model', help='python file path with models')
     parser.add_argument('-o', '--output', default='.', help='output directory')
-    parser.add_argument('-n', '--nsamples', type=int, default=100, help='number of samples')
+    parser.add_argument('-n', '--nsamples', type=int, default=10000, help='number of samples')
     parser.add_argument('-b', '--batch', type=int, default=32)
     parser.add_argument('-e', '--epoch', type=int, default=50)
     parser.add_argument('-p', '--patch', type=int, default=61,
