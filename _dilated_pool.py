@@ -2,8 +2,7 @@
 from tensorflow.python.ops import nn
 from tensorflow.python.layers.pooling import _Pooling2D
 from tensorflow.python.layers import utils
-from tensorflow.contrib.keras.python.keras.layers import Layer
-from tensorflow.contrib.keras.python.keras.utils import conv_utils
+from tensorflow.python.keras.layers import Layer
 
 
 class DilatedMaxPool2D(_Pooling2D, Layer):

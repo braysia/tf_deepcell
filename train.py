@@ -1,11 +1,10 @@
 from __future__ import division, print_function
 import os
 import numpy as np
-from tensorflow.contrib.keras import optimizers, callbacks
-from tensorflow.contrib.keras.python.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.python.keras import optimizers, callbacks
+from tensorflow.python.keras.preprocessing.image import ImageDataGenerator
 from scipy.ndimage import imread
-# from tifffile import imread
-from patches import extract_patches
+from patches import extract_patches, pick_coords, _extract_patches, PatchDataGenerator
 from utils import load_model_py, make_outputdir
 from os.path import join
 
@@ -39,23 +38,32 @@ def train(image_path, labels_path, model_path, output, patchsize=61, nsamples=10
     model.summary()
 
     image, labels = imread(image_path), imread(labels_path).astype(np.uint8)
-    x_train, x_test, y_train, y_test = prepare_patches(nsamples, frac_test, image, labels, patchsize, patchsize)
+
+    num_tests = int(nsamples * FRAC_TEST)
+    coords = zip(*pick_coords(nsamples, labels, patchsize, patchsize))
+    coords_tests, coords_train = coords[:num_tests], coords[num_tests:], 
+    x_tests, y_tests = _extract_patches(image, labels, coords_tests, patchsize, patchsize)
+
+    image = np.expand_dims(image, -1)
+    image = np.expand_dims(image, 0)
+    x_tests = np.expand_dims(x_tests, -1)
 
     make_outputdir(output)
     opt = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     callbacksets = define_callbacks(output, batch_size)
 
-    datagen = ImageDataGenerator(rotation_range=90, shear_range=0, 
+    datagen = PatchDataGenerator(rotation_range=90, shear_range=0, 
                                  horizontal_flip=True, vertical_flip=True)
 
-    history = model.fit_generator(datagen.flow(x_train, y_train, batch_size=batch_size, shuffle=True),
-                                  steps_per_epoch=len(y_train)/batch_size,
+    history = model.fit_generator(datagen.flow(image, labels, coords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
+                                  steps_per_epoch=len(coords_train)/batch_size,
                                   epochs=nepochs,
-                                  validation_data=(x_test, y_test),
-                                  validation_steps=len(y_train)/batch_size,
+                                  validation_data=(x_tests, y_tests),
+                                  validation_steps=len(coords_train)/batch_size,
                                   callbacks=callbacksets)
-    score = model.evaluate(x_test, y_test, batch_size=batch_size)
+
+    score = model.evaluate(x_tests, y_tests, batch_size=batch_size)
     print('score[loss, accuracy]:', score)
     rec = dict(acc=history.history['acc'], val_acc=history.history['val_acc'],
                loss=history.history['loss'], val_loss=history.history['val_loss'])
