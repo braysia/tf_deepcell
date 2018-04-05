@@ -142,3 +142,10 @@ class CropIterator(Iterator):
             return batch_x
         batch_y = self.y[index_array]
         return batch_x, batch_y
+
+    def next(self):
+        with self.lock:
+            index_array = next(self.index_generator)
+        if isinstance(index_array, tuple):
+            index_array = index_array[0]
+        return self._get_batches_of_transformed_samples(index_array)
