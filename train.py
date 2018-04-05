@@ -1,10 +1,12 @@
 from __future__ import division, print_function
 import os
 import numpy as np
-# from tensorflow.python.keras import optimizers, callbacks
-# from tensorflow.python.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.contrib.keras import optimizers, callbacks
-from tensorflow.contrib.keras.python.keras.preprocessing.image import ImageDataGenerator
+try:
+    from tensorflow.python.keras import optimizers, callbacks
+    from tensorflow.python.keras.preprocessing.image import ImageDataGenerator
+except:
+    from tensorflow.contrib.keras import optimizers, callbacks
+    from tensorflow.contrib.keras.python.keras.preprocessing.image import ImageDataGenerator
 from scipy.ndimage import imread
 from patches import extract_patches, pick_coords, _extract_patches, PatchDataGenerator
 from utils import load_model_py, make_outputdir
@@ -57,7 +59,6 @@ def train(image_path, labels_path, model_path, output, patchsize=61, nsamples=10
 
     datagen = PatchDataGenerator(rotation_range=90, shear_range=0, 
                                  horizontal_flip=True, vertical_flip=True)
-
     history = model.fit_generator(datagen.flow(image, labels, coords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
                                   steps_per_epoch=len(coords_train)/batch_size,
                                   epochs=nepochs,
