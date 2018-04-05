@@ -10,4 +10,4 @@ python predict.py -i data/nuc1.png -w data/tests_pretrained.hdf5 -m data/tests_m
 ```
 
 #### 2018/4/4  
-Use tensorflow (1.7.0) and Cuda 9.0
+Use tensorflow (1.3.0) and Cuda 8.0
