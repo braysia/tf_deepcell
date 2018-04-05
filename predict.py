@@ -3,7 +3,7 @@ import os
 import numpy as np
 from os.path import join, basename, splitext
 from scipy.ndimage import imread
-from tensorflow.contrib.keras.python.keras import backend
+from tensorflow.python.keras import backend
 from utils import convert_model_patch2full, load_model_py, make_outputdir
 import tifffile as tiff
 
@@ -13,8 +13,8 @@ def predict(img_path, model_path, weight_path):
     model = load_model_py(model_path)
     model = convert_model_patch2full(model)
     model.load_weights(weight_path)
-
-    model.summary()
+    # model.summary()
+    # assert False
     evaluate_model = backend.function(
         [model.layers[0].input, backend.learning_phase()],
         [model.layers[-1].output]

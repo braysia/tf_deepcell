@@ -1,6 +1,6 @@
-from tensorflow.contrib.keras.python.keras.models import Sequential
-from tensorflow.contrib.keras.python.keras.layers import Conv2D, MaxPooling2D
-from tensorflow.contrib.keras.python.keras.layers.normalization import BatchNormalization
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.python.keras.layers import BatchNormalization
 from utils import Squeeze
 
 model = Sequential([

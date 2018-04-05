@@ -121,7 +121,7 @@ class CropIterator(Iterator):
         x, y = _extract_patches(self._x[0, :, :, 0], self._y, batch_coords, self.patch_h, self.patch_w)
         self.x = np.expand_dims(x, -1)
         self.y = y
-        index_array = np.arange(len(y))
+        index_array = np.arange(len(self.y))
 
         for i, j in enumerate(index_array):
             x = self.x[j]
