@@ -1,6 +1,8 @@
 from __future__ import division
 import numpy as np
-from tensorflow.python.keras.preprocessing.image import ImageDataGenerator, NumpyArrayIterator, Iterator
+from tensorflow.python.keras.preprocessing.image import ImageDataGenerator, Iterator, array_to_img
+import os
+from tensorflow.python.keras._impl.keras import backend as K
 
 
 def _sample_coords_weighted(num, shape, weights):
@@ -90,23 +92,49 @@ class PatchDataGenerator(ImageDataGenerator):
             save_to_dir=save_to_dir, save_prefix=save_prefix, save_format=save_format)
 
 
-class CropIterator(NumpyArrayIterator):
-    def __init__(self, *args, **kwards):
-        self.coords = kwards.pop('coords')
-        self.patch_h = kwards.pop('patch_h')
-        self.patch_w = kwards.pop('patch_w')
-        self._x, self._y = args[0].copy(), args[1].copy()
-        _args = (np.zeros((len(self.coords), self.patch_h, self.patch_w, 1)), np.zeros(len(self.coords)), args[2])  # to get around init error
-        # _args = (np.zeros((1, 1, 1, 1)), np.zeros(1), args[2])  # to get around init error
-        super(CropIterator, self).__init__(*_args, **kwards)
+class CropIterator(Iterator):
+    def __init__(self, x, y, image_data_generator, coords, patch_h, patch_w,
+                 batch_size=32, shuffle=False, seed=None, 
+                 data_format=None, save_to_dir=None, save_prefix='', save_format='png'):
+        self.coords = coords
+        self.patch_h = patch_h
+        self.patch_w = patch_w
+        self._x, self._y = x.copy(), y.copy()
+        self.x = np.asarray(np.zeros((1, patch_h, patch_w, 1)), dtype=K.floatx())
+        if y is not None:
+            self.y = np.zeros(1)
+        else:
+            self.y = None
         self.n = len(self.coords)
 
-    def next(self):
-        with self.lock:
-            index_array = next(self.index_generator)
+        self.image_data_generator = image_data_generator
+        self.data_format = data_format
+        self.save_to_dir = save_to_dir
+        self.save_prefix = save_prefix
+        self.save_format = save_format
+        super(CropIterator, self).__init__(len(self.coords), batch_size, shuffle, seed)
+
+    def _get_batches_of_transformed_samples(self, index_array):
+        batch_x = np.zeros(tuple([len(index_array)] + list(self.x.shape)[1:]), dtype=K.floatx())
+
         batch_coords = [self.coords[i] for i in index_array]
-        x, y = _extract_patches(self._x[0, :, :, 0], self._y, batch_coords, 61, 61)
+        x, y = _extract_patches(self._x[0, :, :, 0], self._y, batch_coords, self.patch_h, self.patch_w)
         self.x = np.expand_dims(x, -1)
         self.y = y
         index_array = np.arange(len(y))
-        return self._get_batches_of_transformed_samples(index_array)
+
+        for i, j in enumerate(index_array):
+            x = self.x[j]
+            x = self.image_data_generator.random_transform(x.astype(K.floatx()))
+            x = self.image_data_generator.standardize(x)
+            batch_x[i] = x
+        if self.save_to_dir:
+            for i, j in enumerate(index_array):
+                img = array_to_img(batch_x[i], self.data_format, scale=True)
+                fname = '{prefix}_{index}_{hash}.{format}'.format(prefix=self.save_prefix, index=j,
+                hash=np.random.randint(1e4), format=self.save_format)
+            img.save(os.path.join(self.save_to_dir, fname))
+        if self.y is None:
+            return batch_x
+        batch_y = self.y[index_array]
+        return batch_x, batch_y
