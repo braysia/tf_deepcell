@@ -1,8 +1,10 @@
 from __future__ import division, print_function
 import os
 import numpy as np
-from tensorflow.python.keras import optimizers, callbacks
-from tensorflow.python.keras.preprocessing.image import ImageDataGenerator
+# from tensorflow.python.keras import optimizers, callbacks
+# from tensorflow.python.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.contrib.keras import optimizers, callbacks
+from tensorflow.contrib.keras.python.keras.preprocessing.image import ImageDataGenerator
 from scipy.ndimage import imread
 from patches import extract_patches, pick_coords, _extract_patches, PatchDataGenerator
 from utils import load_model_py, make_outputdir
@@ -47,7 +49,7 @@ def train(image_path, labels_path, model_path, output, patchsize=61, nsamples=10
     image = np.expand_dims(image, -1)
     image = np.expand_dims(image, 0)
     x_tests = np.expand_dims(x_tests, -1)
-
+    
     make_outputdir(output)
     opt = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])

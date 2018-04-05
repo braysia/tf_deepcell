@@ -3,7 +3,10 @@ import os
 import numpy as np
 from os.path import join, basename, splitext
 from scipy.ndimage import imread
-from tensorflow.python.keras import backend
+try:
+    from tensorflow.python.keras import backend
+except:
+    from tensorflow.contrib.keras.python.keras import backend
 from utils import convert_model_patch2full, load_model_py, make_outputdir
 import tifffile as tiff
 
@@ -13,8 +16,8 @@ def predict(img_path, model_path, weight_path):
     model = load_model_py(model_path)
     model = convert_model_patch2full(model)
     model.load_weights(weight_path)
-    # model.summary()
-    # assert False
+
+    model.summary()
     evaluate_model = backend.function(
         [model.layers[0].input, backend.learning_phase()],
         [model.layers[-1].output]
@@ -22,7 +25,13 @@ def predict(img_path, model_path, weight_path):
 
     x = np.expand_dims(x, -1)
     x = np.expand_dims(x, 0)
+
     cc = evaluate_model([x, 0])[0]
+    
+    # from tensorflow.contrib.keras import optimizers
+    # opt = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    # model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    # cc = model.predict(x)
     return [cc[0, :, :, i] for i in range(cc.shape[-1])]
 
 

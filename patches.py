@@ -1,8 +1,12 @@
 from __future__ import division
 import numpy as np
-from tensorflow.python.keras.preprocessing.image import ImageDataGenerator, Iterator, array_to_img
 import os
-from tensorflow.python.keras._impl.keras import backend as K
+try:
+    from tensorflow.python.keras import backend
+    from tensorflow.python.keras.preprocessing.image import ImageDataGenerator, Iterator, array_to_img
+except:
+    from tensorflow.contrib.keras.python.keras.preprocessing.image import ImageDataGenerator, Iterator, array_to_img
+    from tensorflow.contrib.keras.python.keras import backend as K
 
 
 def _sample_coords_weighted(num, shape, weights):
