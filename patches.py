@@ -61,7 +61,7 @@ def extract_patches(num, x, y, patch_h, patch_w):
     """
     coords = pick_coords(num, y, patch_h, patch_w)
     h, w = int(np.floor(patch_h/2)), int(np.floor(patch_w/2))
-    xstack = np.zeros((num, patch_h, patch_w), np.float32)
+    xstack = np.zeros((num, patch_h, patch_w, x.shape[-1]), np.float32)
     ystack = np.zeros(num)
     for n, (ch, cw) in enumerate(zip(*coords)):
         xstack[n, :, :] = x[ch-h:ch+h+1, cw-w:cw+w+1]
@@ -71,17 +71,17 @@ def extract_patches(num, x, y, patch_h, patch_w):
 
 def _extract_patches(x, y, coords, patch_h, patch_w):
     """
-    x: input images
+    x: input images x.shape = (hpix, wpix, ch)
     y: feature image with labels
 
     Sample many windows from a large image. It will correct for labels unbalance.
     (If there are less labels for cell boundaries, it increases the sampling probability)
     """
     h, w = int(np.floor(patch_h/2)), int(np.floor(patch_w/2))
-    xstack = np.zeros((len(coords), patch_h, patch_w), np.float32)
+    xstack = np.zeros((len(coords), patch_h, patch_w, x.shape[-1]), np.float32)
     ystack = np.zeros(len(coords))
     for n, (ch, cw) in enumerate(coords):
-        xstack[n, :, :] = x[ch-h:ch+h+1, cw-w:cw+w+1]
+        xstack[n, :, :, :] = x[ch-h:ch+h+1, cw-w:cw+w+1]
         ystack[n] = y[ch, cw]
     return xstack, ystack
 
@@ -98,13 +98,13 @@ class PatchDataGenerator(ImageDataGenerator):
 
 class CropIterator(Iterator):
     def __init__(self, x, y, image_data_generator, coords, patch_h, patch_w,
-                 batch_size=32, shuffle=False, seed=None, 
+                 batch_size=32, shuffle=False, seed=None,
                  data_format=None, save_to_dir=None, save_prefix='', save_format='png'):
         self.coords = coords
         self.patch_h = patch_h
         self.patch_w = patch_w
         self._x, self._y = x.copy(), y.copy()
-        self.x = np.asarray(np.zeros((1, patch_h, patch_w, 1)), dtype=K.floatx())
+        self.x = np.asarray(np.zeros((1, patch_h, patch_w, self._x.shape[-1])), dtype=K.floatx())
         if y is not None:
             self.y = np.zeros(1)
         else:
@@ -122,8 +122,8 @@ class CropIterator(Iterator):
         batch_x = np.zeros(tuple([len(index_array)] + list(self.x.shape)[1:]), dtype=K.floatx())
 
         batch_coords = [self.coords[i] for i in index_array]
-        x, y = _extract_patches(self._x[0, :, :, 0], self._y, batch_coords, self.patch_h, self.patch_w)
-        self.x = np.expand_dims(x, -1)
+        x, y = _extract_patches(self._x[0, :, :, :], self._y, batch_coords, self.patch_h, self.patch_w)
+        self.x = x
         self.y = y
         index_array = np.arange(len(self.y))
 
