@@ -5,11 +5,13 @@ try:
     from tensorflow.python.keras import backend
     from tensorflow.python.keras.layers import Layer, Conv2D, MaxPooling2D
     from tensorflow.python.keras.models import Sequential
+    from tensorflow.python.keras.models import load_model
 except:
     from tensorflow.contrib.keras.python.keras.engine.topology import Layer
     from tensorflow.contrib.keras.python.keras import backend
     from tensorflow.contrib.keras.python.keras.layers import Conv2D, MaxPooling2D
     from tensorflow.contrib.keras.python.keras.models import Sequential
+    from tensorflow.contrib.keras.python.keras.models import load_model
 from _dilated_pool import DilatedMaxPool2D
 import numpy as np
 from scipy.ndimage import imread as imread0
@@ -62,9 +64,13 @@ def convert_model_patch2full(model):
 
 
 def load_model_py(path):
-    fname = os.path.basename(path).split('.')[0]
-    module = imp.load_source(fname, path)
-    return module.model
+    if path.endswith('.py'):
+        fname = os.path.basename(path).split('.')[0]
+        module = imp.load_source(fname, path)
+        return module.model
+    elif path.endswith('.hdf5'):
+        return load_model(path, custom_objects={'Squeeze':Squeeze})
+
 
 
 def make_outputdir(output):

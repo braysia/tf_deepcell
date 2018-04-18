@@ -16,7 +16,6 @@ from utils import parse_image_files
 FRAC_TEST = 0.1
 
 
-
 def define_callbacks(output, batch_size):
     csv_logger = callbacks.CSVLogger(join(output, 'training.log'))
     earlystop = callbacks.EarlyStopping(monitor='val_loss', patience=2)
@@ -76,14 +75,26 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
 
 
 def _parse_command_line_args():
+    """
+    image:  Path to a tif or png file (e.g. data/nuc0.png).
+            To pass multiple image files (size can be varied), use syntax like
+            "-i im0.tif / im1.tif / im2.tif", and pass the same number of labels.
+    labels: (e.g. data/labels0.tif)
+    model:  path to a python file describing a model (e.g. data/tests_model.py)
+            or weights.*.hdf5 produced by ModelCheckPoint.
+            To resume training, pass the hdf5 file.
+    n:      A number of pixels for training. Use a large number (like 1,000,000)
+    batch:  Typically 128-512?
+    """
+
     import argparse
     parser = argparse.ArgumentParser(description='predict')
     parser.add_argument('-i', '--image', help='image file path', nargs="*")
     parser.add_argument('-l', '--labels', help='labels file path', nargs="*")
-    parser.add_argument('-m', '--model', help='python file path with models')
+    parser.add_argument('-m', '--model', help='path to python file or hdf5')
     parser.add_argument('-o', '--output', default='.', help='output directory')
     parser.add_argument('-n', '--nsamples', type=int, default=10000, help='number of samples')
-    parser.add_argument('-b', '--batch', type=int, default=32)
+    parser.add_argument('-b', '--batch', type=int, default=64)
     parser.add_argument('-e', '--epoch', type=int, default=50)
     parser.add_argument('-p', '--patch', type=int, default=61,
                         help='pixel size of image patches. make it odd')
@@ -96,6 +107,7 @@ def _main():
     labels = parse_image_files(args.labels)[0]
     train(images, labels, args.model, args.output, args.patch,
           args.nsamples, args.batch, args.epoch)
+
 
 if __name__ == "__main__":
     _main()
