@@ -2,7 +2,7 @@ from __future__ import division
 import os
 import numpy as np
 from os.path import join, basename, splitext
-from scipy.ndimage import imread
+from utils import imread
 try:
     from tensorflow.python.keras import backend
 except:
@@ -13,6 +13,13 @@ import tifffile as tiff
 
 def predict(img_path, model_path, weight_path):
     x = imread(img_path)
+
+    if x.ndim == 2:
+        x = np.expand_dims(x, -1)
+    elif x.ndim == 3:
+        x = np.moveaxis(x, 0, -1)
+    x = np.expand_dims(x, 0)
+
     model = load_model_py(model_path)
     model = convert_model_patch2full(model)
     model.load_weights(weight_path)
@@ -23,11 +30,8 @@ def predict(img_path, model_path, weight_path):
         [model.layers[-1].output]
         )
 
-    x = np.expand_dims(x, -1)
-    x = np.expand_dims(x, 0)
-
     cc = evaluate_model([x, 0])[0]
-    
+
     # from tensorflow.contrib.keras import optimizers
     # opt = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     # model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
