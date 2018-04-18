@@ -7,11 +7,11 @@ try:
 except:
     from tensorflow.contrib.keras import optimizers, callbacks
     from tensorflow.contrib.keras.python.keras.preprocessing.image import ImageDataGenerator
-from utils import imread
+from tfutils import imread
 from patches import extract_patches, pick_coords, pick_coords_list, extract_patch_list, _extract_patches, PatchDataGeneratorList
-from utils import load_model_py, make_outputdir
+from tfutils import load_model_py, make_outputdir
 from os.path import join
-from utils import parse_image_files
+from tfutils import parse_image_files
 
 FRAC_TEST = 0.1
 

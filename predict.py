@@ -2,12 +2,12 @@ from __future__ import division
 import os
 import numpy as np
 from os.path import join, basename, splitext
-from utils import imread
+from tfutils import imread
 try:
     from tensorflow.python.keras import backend
 except:
     from tensorflow.contrib.keras.python.keras import backend
-from utils import convert_model_patch2full, load_model_py, make_outputdir
+from tfutils import convert_model_patch2full, load_model_py, make_outputdir
 import tifffile as tiff
 
 

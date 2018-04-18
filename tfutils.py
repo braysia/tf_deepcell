@@ -17,6 +17,7 @@ import numpy as np
 from scipy.ndimage import imread as imread0
 import tifffile as tiff
 
+
 class Squeeze(Layer):
     def __init__(self, output_dim=None, **kwargs):
         self.output_dim = output_dim
@@ -42,7 +43,7 @@ def convert_model_patch2full(model):
     dr = 1
     new_model = Sequential()
     for nl, layer in enumerate(model.layers):
-        if isinstance(layer, Squeeze):
+        if layer.name.startswith('squeeze_'):
             continue
         if isinstance(layer, MaxPooling2D):
             newl = DilatedMaxPool2D(dilation_rate=dr)

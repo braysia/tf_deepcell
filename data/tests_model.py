@@ -6,7 +6,7 @@ except:
     from tensorflow.contrib.keras.python.keras.layers import Conv2D, MaxPooling2D
     from tensorflow.contrib.keras.python.keras.models import Sequential
     from tensorflow.contrib.keras.python.keras.layers.normalization import BatchNormalization
-from utils import Squeeze
+from tfutils import Squeeze
 
 model = Sequential([
     Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=(None, None, 1)),
