@@ -38,17 +38,32 @@ def pick_coords(num, features, patch_h, patch_w):
     return _sample_coords_weighted(num, features.shape, prob_2d.flatten())
 
 
-def _pick_coords(num, features, patch_h, patch_w):
+def pick_coords_list(num, li_features, patch_h, patch_w):
     """
     features: img with labels
     """
-    prob_2d = _calc_equal_weights(features.astype(np.uint8))
-    _ph, _pw = int(np.floor(patch_h/2)), int(np.floor(patch_w/2))
-    perim = np.zeros(prob_2d.shape, dtype=np.bool)
-    perim[_ph:-_ph, _pw:-_pw] = True
-    prob_2d[~perim] = 0
-    return _sample_coords_weighted(num, features.shape, prob_2d.flatten())
+    from random import shuffle
+    num = int(num/len(li_features))
+    li_coords = []
+    for en, features in enumerate(li_features):
+        coords = pick_coords(num, features, patch_h, patch_w)
+        coords = zip(*(np.ones(num, np.uint8) * en, coords[0], coords[1]))
+        li_coords.extend(coords)
+    shuffle(li_coords)
+    return li_coords
 
+
+
+# def _pick_coords(num, features, patch_h, patch_w):
+#     """
+#     features: img with labels
+#     """
+#     prob_2d = _calc_equal_weights(features.astype(np.uint8))
+#     _ph, _pw = int(np.floor(patch_h/2)), int(np.floor(patch_w/2))
+#     perim = np.zeros(prob_2d.shape, dtype=np.bool)
+#     perim[_ph:-_ph, _pw:-_pw] = True
+#     prob_2d[~perim] = 0
+#     return _sample_coords_weighted(num, features.shape, prob_2d.flatten())
 
 
 def extract_patches(num, x, y, patch_h, patch_w):
@@ -86,6 +101,16 @@ def _extract_patches(x, y, coords, patch_h, patch_w):
     return xstack, ystack
 
 
+def extract_patch_list(lix, liy, ecoords, patch_h, patch_w):
+    h, w = int(np.floor(patch_h/2)), int(np.floor(patch_w/2))
+    xstack = np.zeros((len(ecoords), patch_h, patch_w, lix[0].shape[-1]), np.float32)
+    ystack = np.zeros(len(ecoords))
+    for n, (cn, ch, cw) in enumerate(ecoords):
+        xstack[n, :, :, :] = lix[cn][ch-h:ch+h+1, cw-w:cw+w+1]
+        ystack[n] = liy[cn][ch, cw]
+    return xstack, ystack
+
+
 class PatchDataGenerator(ImageDataGenerator):
     def flow(self, x, y, coords, patch_h, patch_w, batch_size=32, shuffle=True, seed=None,
              save_to_dir=None, save_prefix='', save_format='png'):
@@ -98,18 +123,25 @@ class PatchDataGenerator(ImageDataGenerator):
 
 class CropIterator(Iterator):
     def __init__(self, x, y, image_data_generator, coords, patch_h, patch_w,
-                 batch_size=32, shuffle=False, seed=None,
+                 batch_size=32, shuffle=False, seed=None, func_patch=_extract_patches,
                  data_format=None, save_to_dir=None, save_prefix='', save_format='png'):
         self.coords = coords
         self.patch_h = patch_h
         self.patch_w = patch_w
-        self._x, self._y = x.copy(), y.copy()
-        self.x = np.asarray(np.zeros((1, patch_h, patch_w, self._x.shape[-1])), dtype=K.floatx())
+        if isinstance(x, list):
+            self._x, self._y = x[:], y[:]
+            chnum = self._x[0].shape[-1]
+        else:
+            self._x, self._y = x.copy(), y.copy()
+            self._x = self._x[0, :, :, :]
+            chnum = self._x.shape[-1]
+        self.x = np.asarray(np.zeros((1, patch_h, patch_w, chnum)), dtype=K.floatx())
         if y is not None:
             self.y = np.zeros(1)
         else:
             self.y = None
         self.n = len(self.coords)
+        self.func_patch = func_patch
 
         self.image_data_generator = image_data_generator
         self.data_format = data_format
@@ -120,9 +152,8 @@ class CropIterator(Iterator):
 
     def _get_batches_of_transformed_samples(self, index_array):
         batch_x = np.zeros(tuple([len(index_array)] + list(self.x.shape)[1:]), dtype=K.floatx())
-
         batch_coords = [self.coords[i] for i in index_array]
-        x, y = _extract_patches(self._x[0, :, :, :], self._y, batch_coords, self.patch_h, self.patch_w)
+        x, y = self.func_patch(self._x, self._y, batch_coords, self.patch_h, self.patch_w)
         self.x = x
         self.y = y
         index_array = np.arange(len(self.y))
@@ -149,3 +180,15 @@ class CropIterator(Iterator):
         if isinstance(index_array, tuple):
             index_array = index_array[0]
         return self._get_batches_of_transformed_samples(index_array)
+
+
+class PatchDataGeneratorList(ImageDataGenerator):
+    def flow(self, x, y, coords, patch_h, patch_w, batch_size=32, shuffle=True, seed=None,
+             save_to_dir=None, save_prefix='', save_format='png'):
+        x = [i[0] for i in x]
+        return CropIterator(
+            x, y, self, coords=coords, patch_h=patch_h, patch_w=patch_w,
+            batch_size=batch_size, shuffle=shuffle, seed=seed,
+            data_format=self.data_format, func_patch=extract_patch_list,
+            save_to_dir=save_to_dir, save_prefix=save_prefix, save_format=save_format)
+

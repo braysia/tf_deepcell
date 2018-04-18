@@ -8,22 +8,13 @@ except:
     from tensorflow.contrib.keras import optimizers, callbacks
     from tensorflow.contrib.keras.python.keras.preprocessing.image import ImageDataGenerator
 from utils import imread
-from patches import extract_patches, pick_coords, _extract_patches, PatchDataGenerator
+from patches import extract_patches, pick_coords, pick_coords_list, extract_patch_list, _extract_patches, PatchDataGeneratorList
 from utils import load_model_py, make_outputdir
 from os.path import join
+from utils import parse_image_files
 
 FRAC_TEST = 0.1
 
-
-def prepare_patches(nsamples, frac_test, x, y, ph, pw):
-    x_all, y_all = extract_patches(nsamples, x, y, ph, pw)
-    x_train = x_all[:-int(nsamples * frac_test), :, :]
-    x_test = x_all[-int(nsamples * frac_test):, :, :]
-    y_train = y_all[:-int(nsamples * frac_test)]
-    y_test = y_all[-int(nsamples * frac_test):]
-    x_train = np.expand_dims(x_train, -1)
-    x_test = np.expand_dims(x_test, -1)
-    return x_train, x_test, y_train, y_test
 
 
 def define_callbacks(output, batch_size):
@@ -35,36 +26,40 @@ def define_callbacks(output, batch_size):
     return [csv_logger, earlystop, tensorboard, cp_cb]
 
 
-def train(image_path, labels_path, model_path, output, patchsize=61, nsamples=10000,
+def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10000,
           batch_size=32, nepochs=100, frac_test=FRAC_TEST):
     assert np.bool(patchsize & 0x1)  # check if odd
     model = load_model_py(model_path)
     model.summary()
 
-    image, labels = imread(image_path), imread(labels_path).astype(np.uint8)
-    if image.ndim == 2:
-        image = np.expand_dims(image, -1)
-    elif image.ndim == 3:
-        image = np.moveaxis(image, 0, -1)
+    li_image, li_labels = [], []
+    for image_path, labels_path in zip(image_list, labels_list):
+        image, labels = imread(image_path), imread(labels_path).astype(np.uint8)
+        if image.ndim == 2:
+            image = np.expand_dims(image, -1)
+        elif image.ndim == 3:
+            image = np.moveaxis(image, 0, -1)
+        li_image.append(image)
+        li_labels.append(labels)
 
     num_tests = int(nsamples * FRAC_TEST)
-    coords = zip(*pick_coords(nsamples, labels, patchsize, patchsize))
-    coords_tests, coords_train = coords[:num_tests], coords[num_tests:],
-    x_tests, y_tests = _extract_patches(image, labels, coords_tests, patchsize, patchsize)
-    image = np.expand_dims(image, 0)
+    ecoords = pick_coords_list(nsamples, li_labels, patchsize, patchsize)
+    ecoords_tests, ecoords_train = ecoords[:num_tests], ecoords[num_tests:],
+    x_tests, y_tests = extract_patch_list(li_image, li_labels, ecoords_tests, patchsize, patchsize)
+    li_image = [np.expand_dims(i, 0) for i in li_image]
 
     make_outputdir(output)
     opt = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     callbacksets = define_callbacks(output, batch_size)
 
-    datagen = PatchDataGenerator(rotation_range=90, shear_range=0,
-                                 horizontal_flip=True, vertical_flip=True)
-    history = model.fit_generator(datagen.flow(image, labels, coords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
-                                  steps_per_epoch=len(coords_train)/batch_size,
+    datagen = PatchDataGeneratorList(rotation_range=90, shear_range=0,
+                                     horizontal_flip=True, vertical_flip=True)
+    history = model.fit_generator(datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
+                                  steps_per_epoch=len(ecoords_train)/batch_size,
                                   epochs=nepochs,
                                   validation_data=(x_tests, y_tests),
-                                  validation_steps=len(coords_train)/batch_size,
+                                  validation_steps=len(ecoords_train)/batch_size,
                                   callbacks=callbacksets)
 
     score = model.evaluate(x_tests, y_tests, batch_size=batch_size)
@@ -83,8 +78,8 @@ def train(image_path, labels_path, model_path, output, patchsize=61, nsamples=10
 def _parse_command_line_args():
     import argparse
     parser = argparse.ArgumentParser(description='predict')
-    parser.add_argument('-i', '--image', help='image file path')
-    parser.add_argument('-l', '--labels', help='labels file path')
+    parser.add_argument('-i', '--image', help='image file path', nargs="*")
+    parser.add_argument('-l', '--labels', help='labels file path', nargs="*")
     parser.add_argument('-m', '--model', help='python file path with models')
     parser.add_argument('-o', '--output', default='.', help='output directory')
     parser.add_argument('-n', '--nsamples', type=int, default=10000, help='number of samples')
@@ -97,7 +92,9 @@ def _parse_command_line_args():
 
 def _main():
     args = _parse_command_line_args()
-    train(args.image, args.labels, args.model, args.output, args.patch,
+    images = parse_image_files(args.image)[0]
+    labels = parse_image_files(args.labels)[0]
+    train(images, labels, args.model, args.output, args.patch,
           args.nsamples, args.batch, args.epoch)
 
 if __name__ == "__main__":

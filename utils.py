@@ -92,3 +92,19 @@ def imread(path):
         return img
     else:
         return imread_check_tiff(path)
+
+
+def parse_image_files(inputs):
+    if "/" not in inputs:
+        return (inputs, )
+    store = []
+    li = []
+    while inputs:
+        element = inputs.pop(0)
+        if element == "/":
+            store.append(li)
+            li = []
+        else:
+            li.append(element)
+    store.append(li)
+    return zip(*store)
