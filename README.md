@@ -11,3 +11,10 @@ python predict.py -i data/nuc1.png -w data/tests_pretrained.hdf5 -m data/tests_m
 ```
 
 Use tensorflow (1.3.0) and Cuda 8.0
+
+
+
+
+```
+python train.py -i data/composite_nuc.tif / data/composite_nuc.tif -l data/labels0.tif / data/labels0.tif -mdata/tests_model_composite.py -o outputc -n 3000 -e 2 -p 61
+```
