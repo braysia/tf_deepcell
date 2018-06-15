@@ -22,6 +22,8 @@ from tfutils import load_model_py, make_outputdir
 from os.path import join
 from tfutils import parse_image_files
 
+
+
 FRAC_TEST = 0.1
 STEPS_PER_EPOCH = 500
 val_batch_size = 10
@@ -31,17 +33,21 @@ CROP_SIZE = 256
 def define_callbacks(output, batch_size):
     csv_logger = callbacks.CSVLogger(join(output, 'training.log'))
     earlystop = callbacks.EarlyStopping(monitor='val_loss', patience=2)
-    # tensorboard = callbacks.TensorBoard(batch_size=batch_size)
     fpath = join(output, 'weights.{epoch:02d}-{loss:.2f}-{acc:.2f}-{val_loss:.2f}-{val_acc:.2f}.hdf5')
     cp_cb = callbacks.ModelCheckpoint(filepath=fpath, monitor='val_loss', save_best_only=True)
     return [csv_logger, earlystop, cp_cb]
 
 
+def conv_labels2dto3d(labels):
+    lbnums = np.unique(labels)
+    arr = np.zeros((labels.shape[0], labels.shape[1], len(lbnums)), np.uint8)
+    for i in lbnums:
+        arr[:, :, i] = labels == i
+    return arr
+
+
 def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10000,
           batch_size=32, nepochs=100, frac_test=FRAC_TEST):
-    # assert np.bool(patchsize & 0x1)  # check if odd
-
-
 
     model = utils.model_builder.get_model_3_class(256, 256, activation=None)
     loss = weighted_crossentropy
@@ -57,9 +63,7 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
 
     optimizer = keras.optimizers.RMSprop(lr=1e-4)
     model.compile(loss=loss, metrics=metrics, optimizer=optimizer)
-
-    # model = load_model_py(model_path)
-    # model.summary()
+    model.summary()
 
     li_image, li_labels = [], []
     for image_path, labels_path in zip(image_list, labels_list):
@@ -73,19 +77,25 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
 
     num_tests = int(nsamples * FRAC_TEST)
     ecoords = pick_coords_list(nsamples, li_labels, patchsize, patchsize)
+
+    li_labels = [conv_labels2dto3d(lb) for lb in li_labels]
+
     ecoords_tests, ecoords_train = ecoords[:num_tests], ecoords[num_tests:],
     x_tests, y_tests = extract_patch_list(li_image, li_labels, ecoords_tests, patchsize, patchsize)
-    li_image = [np.expand_dims(i, 0) for i in li_image]
 
     make_outputdir(output)
     callbacks = define_callbacks(output, batch_size=64)
 
     datagen = PatchDataGeneratorList(rotation_range=90, shear_range=0,
                                      horizontal_flip=True, vertical_flip=True)
+    generator=datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True)
+    aa = generator.next()
+    # import ipdb;ipdb.set_trace()
 
-    generator=datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
-
+    # from keras.preprocessing.image import ImageDataGenerator
+    # dgen = ImageDataGenerator()
     history = model.fit_generator(
+        # generator = dgen.flow(x_tests, np.expand_dims(y_tests, -1)),
         generator=datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
         steps_per_epoch=STEPS_PER_EPOCH,
         epochs=nepochs,

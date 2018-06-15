@@ -91,22 +91,20 @@ def _extract_patches(x, y, coords, patch_h, patch_w):
     """
     h, w = int(np.floor(patch_h/2)), int(np.floor(patch_w/2))
     xstack = np.zeros((len(coords), patch_h, patch_w, x.shape[-1]), np.float32)
-    ystack = np.zeros(len(coords))
+    ystack = np.zeros((len(coords), patch_h, patch_w, y.shape[-1]), np.float32)
     for n, (ch, cw) in enumerate(coords):
-        xstack[n, :, :, :] = x[ch-h:ch+h+1, cw-w:cw+w+1]
-        ystack[n] = y[ch, cw]
+        xstack[n, :, :, :] = x[ch-h:ch+h, cw-w:cw+w]
+        ystack[n, :, :, :] = y[ch-h:ch+h, cw-w:cw+w]
     return xstack, ystack
 
 
 def extract_patch_list(lix, liy, ecoords, patch_h, patch_w):
     h, w = int(np.floor(patch_h/2)), int(np.floor(patch_w/2))
     xstack = np.zeros((len(ecoords), patch_h, patch_w, lix[0].shape[-1]), np.float32)
-    ystack = np.zeros(len(ecoords))
-    ystack = np.zeros((len(ecoords), patch_h, patch_w), np.float32)
+    ystack = np.zeros((len(ecoords), patch_h, patch_w, liy[0].shape[-1]), np.float32)
     for n, (cn, ch, cw) in enumerate(ecoords):
         xstack[n, :, :, :] = lix[cn][ch-h:ch+h, cw-w:cw+w]
-        ystack[n, :, :] = liy[cn][ch-h:ch+h, cw-w:cw+w]
-        # ystack[n] = liy[cn][ch, cw]
+        ystack[n, :, :, :] = liy[cn][ch-h:ch+h, cw-w:cw+w]
     return xstack, ystack
 
 
@@ -153,7 +151,7 @@ class CropIterator(Iterator):
         batch_x = np.zeros(tuple([len(index_array)] + list(self.x.shape)[1:]), dtype=K.floatx())
         batch_coords = [self.coords[i] for i in index_array]
         x, y = self.func_patch(self._x, self._y, batch_coords, self.patch_h, self.patch_w)
-        y = np.expand_dims(y, -1)
+        # y = np.expand_dims(y, -1)
         self.x = x
         self.y = y
         index_array = np.arange(len(self.y))
@@ -185,7 +183,8 @@ class CropIterator(Iterator):
 class PatchDataGeneratorList(ImageDataGenerator):
     def flow(self, x, y, coords, patch_h, patch_w, batch_size=32, shuffle=True, seed=None,
              save_to_dir=None, save_prefix='', save_format='png'):
-        x = [i[0] for i in x]
+        # import ipdb;ipdb.set_trace()
+        # x = [i[0] for i in x]
         return CropIterator(
             x, y, self, coords=coords, patch_h=patch_h, patch_w=patch_w,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
