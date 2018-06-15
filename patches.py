@@ -1,12 +1,9 @@
 from __future__ import division
 import numpy as np
 import os
-try:
-    from tensorflow.python.keras import backend
-    from tensorflow.python.keras.preprocessing.image import ImageDataGenerator, Iterator, array_to_img
-except:
-    from tensorflow.contrib.keras.python.keras.preprocessing.image import ImageDataGenerator, Iterator, array_to_img
-    from tensorflow.contrib.keras.python.keras import backend as K
+
+from keras.preprocessing.image import ImageDataGenerator, Iterator, array_to_img
+from keras import backend as K
 
 
 def _sample_coords_weighted(num, shape, weights):
@@ -105,9 +102,11 @@ def extract_patch_list(lix, liy, ecoords, patch_h, patch_w):
     h, w = int(np.floor(patch_h/2)), int(np.floor(patch_w/2))
     xstack = np.zeros((len(ecoords), patch_h, patch_w, lix[0].shape[-1]), np.float32)
     ystack = np.zeros(len(ecoords))
+    ystack = np.zeros((len(ecoords), patch_h, patch_w), np.float32)
     for n, (cn, ch, cw) in enumerate(ecoords):
-        xstack[n, :, :, :] = lix[cn][ch-h:ch+h+1, cw-w:cw+w+1]
-        ystack[n] = liy[cn][ch, cw]
+        xstack[n, :, :, :] = lix[cn][ch-h:ch+h, cw-w:cw+w]
+        ystack[n, :, :] = liy[cn][ch-h:ch+h, cw-w:cw+w]
+        # ystack[n] = liy[cn][ch, cw]
     return xstack, ystack
 
 
@@ -154,6 +153,7 @@ class CropIterator(Iterator):
         batch_x = np.zeros(tuple([len(index_array)] + list(self.x.shape)[1:]), dtype=K.floatx())
         batch_coords = [self.coords[i] for i in index_array]
         x, y = self.func_patch(self._x, self._y, batch_coords, self.patch_h, self.patch_w)
+        y = np.expand_dims(y, -1)
         self.x = x
         self.y = y
         index_array = np.arange(len(self.y))
