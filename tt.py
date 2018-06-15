@@ -23,7 +23,6 @@ from os.path import join
 from tfutils import parse_image_files
 
 
-
 FRAC_TEST = 0.1
 STEPS_PER_EPOCH = 500
 val_batch_size = 10
@@ -46,10 +45,25 @@ def conv_labels2dto3d(labels):
     return arr
 
 
+def normalize(orig_img):
+    # normalize to [0,1]
+    percentile = 99.9
+    high = np.percentile(orig_img, percentile)
+    low = np.percentile(orig_img, 100-percentile)
+
+    img = np.minimum(high, orig_img)
+    img = np.maximum(low, img)
+
+    img = (img - low) / (high - low) # gives float64, thus cast to 8 bit later
+    # img = skimage.img_as_ubyte(img)
+    return img
+
+
+
 def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10000,
           batch_size=32, nepochs=100, frac_test=FRAC_TEST):
 
-    model = utils.model_builder.get_model_3_class(256, 256, activation=None)
+    model = utils.model_builder.get_model_3_class(CROP_SIZE, CROP_SIZE, activation=None)
     loss = weighted_crossentropy
 
     metrics = [keras.metrics.categorical_accuracy,
@@ -68,6 +82,7 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
     li_image, li_labels = [], []
     for image_path, labels_path in zip(image_list, labels_list):
         image, labels = imread(image_path), imread(labels_path).astype(np.uint8)
+        image = normalize(image)
         if image.ndim == 2:
             image = np.expand_dims(image, -1)
         elif image.ndim == 3:
@@ -88,14 +103,8 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
 
     datagen = PatchDataGeneratorList(rotation_range=90, shear_range=0,
                                      horizontal_flip=True, vertical_flip=True)
-    generator=datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True)
-    aa = generator.next()
-    # import ipdb;ipdb.set_trace()
 
-    # from keras.preprocessing.image import ImageDataGenerator
-    # dgen = ImageDataGenerator()
     history = model.fit_generator(
-        # generator = dgen.flow(x_tests, np.expand_dims(y_tests, -1)),
         generator=datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
         steps_per_epoch=STEPS_PER_EPOCH,
         epochs=nepochs,
@@ -104,15 +113,6 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
         callbacks=callbacks,
         verbose = 1
     )
-    import ipdb;ipdb.set_trace()
-
-    # history = model.fit_generator(datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
-    #                               steps_per_epoch=len(ecoords_train)/batch_size,
-    #                               epochs=nepochs,
-    #                               validation_data=(x_tests, y_tests),
-    #                               validation_steps=len(ecoords_train)/batch_size,
-    #                               callbacks=callbacksets)
-
 
     score = model.evaluate(x_tests, y_tests, batch_size=batch_size)
     print('score[loss, accuracy]:', score)
