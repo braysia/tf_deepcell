@@ -25,7 +25,6 @@ from on_the_fly import affine_transform, random_flip, random_rotate, random_illu
 
 
 FRAC_TEST = 0.1
-val_batch_size = 10
 augment_pipe = [affine_transform(points=20, distort=3), random_flip(),
                 random_rotate(), random_illum(perc=0.25)]
 
@@ -38,8 +37,8 @@ def define_callbacks(output):
     return [csv_logger, cp_cb]
 
 
-def train(image_list, labels_list, output, patchsize=256, nsamples=6400,
-          batch_size=64, nepochs=10, frac_test=FRAC_TEST):
+def train(image_list, labels_list, output, patchsize=256, nsteps=100,
+          batch_size=12, nepochs=10):
 
     model = utils.model_builder.get_model_3_class(patchsize, patchsize, activation=None)
     loss = weighted_crossentropy
@@ -53,7 +52,7 @@ def train(image_list, labels_list, output, patchsize=256, nsamples=6400,
                ]
     optimizer = keras.optimizers.RMSprop(lr=1e-4)
     model.compile(loss=loss, metrics=metrics, optimizer=optimizer)
-    model.summary()
+    # model.summary()
 
     li_image, li_labels = [], []
     for image_path, labels_path in zip(image_list, labels_list):
@@ -66,8 +65,8 @@ def train(image_list, labels_list, output, patchsize=256, nsamples=6400,
         li_image.append(image)
         li_labels.append(labels)
 
-    num_tests = int(nsamples * FRAC_TEST)
-    ecoords = pick_coords_list(nsamples, li_labels, patchsize, patchsize)
+    num_tests = int(nsteps * batch_size * FRAC_TEST)
+    ecoords = pick_coords_list(nsteps * batch_size, li_labels, patchsize, patchsize)
     li_labels = [conv_labels2dto3d(lb) for lb in li_labels]
     ecoords_tests, ecoords_train = ecoords[:num_tests], ecoords[num_tests:]
     x_tests, y_tests = extract_patch_list(li_image, li_labels, ecoords_tests, patchsize, patchsize)
@@ -79,7 +78,7 @@ def train(image_list, labels_list, output, patchsize=256, nsamples=6400,
 
     history = model.fit_generator(
         generator=datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
-        steps_per_epoch=int(nsamples/batch_size),
+        steps_per_epoch=nsteps,
         epochs=nepochs,
         validation_data=(x_tests, y_tests),
         # validation_steps=len(ecoords_train)/batch_size,
@@ -105,11 +104,9 @@ def _parse_command_line_args():
             To pass multiple image files (size can be varied), use syntax like
             "-i im0.tif / im1.tif / im2.tif", and pass the same number of labels.
     labels: (e.g. data/labels0.tif)
-    model:  path to a python file describing a model (e.g. data/tests_model.py)
-            or weights.*.hdf5 produced by ModelCheckPoint.
-            To resume training, pass the hdf5 file.
-    n:      A number of pixels for training. Use a large number (like 1,000,000)
-    batch:  Typically 128-512?
+    nsteps: A number of steps per epoch. A total patches passed to a model will be
+            batch * nsteps.
+    batch:  Typically 10-32? This will affect a memory usage.
     """
 
     import argparse
@@ -117,11 +114,11 @@ def _parse_command_line_args():
     parser.add_argument('-i', '--image', help='image file path', nargs="*")
     parser.add_argument('-l', '--labels', help='labels file path', nargs="*")
     parser.add_argument('-o', '--output', default='.', help='output directory')
-    parser.add_argument('-n', '--nsamples', type=int, default=100, help='number of samples')
-    parser.add_argument('-b', '--batch', type=int, default=64)
+    parser.add_argument('-n', '--nsteps', type=int, default=100, help='number of steps')
+    parser.add_argument('-b', '--batch', type=int, default=16)
     parser.add_argument('-e', '--epoch', type=int, default=50)
-    parser.add_argument('-p', '--patch', type=int, default=61,
-                        help='pixel size of image patches. make it odd')
+    parser.add_argument('-p', '--patch', type=int, default=256,
+                        help='pixel size of image patches. make it even')
     return parser.parse_args()
 
 
