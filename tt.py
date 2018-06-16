@@ -127,7 +127,7 @@ def _main():
     images = parse_image_files(args.image)[0]
     labels = parse_image_files(args.labels)[0]
     train(images, labels, args.output, args.patch,
-          args.nsamples, args.batch, args.epoch)
+          args.nsteps, args.batch, args.epoch)
 
 
 if __name__ == "__main__":
