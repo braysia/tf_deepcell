@@ -18,46 +18,26 @@ import keras.optimizers
 
 from tfutils import imread
 from patches import extract_patches, pick_coords, pick_coords_list, extract_patch_list, _extract_patches, PatchDataGeneratorList
-from tfutils import load_model_py, make_outputdir
+from tfutils import make_outputdir, normalize, conv_labels2dto3d
 from os.path import join
 from tfutils import parse_image_files
+from on_the_fly import affine_transform, random_flip, random_rotate, random_illum
 
 
 FRAC_TEST = 0.1
-STEPS_PER_EPOCH = 500
+STEPS_PER_EPOCH = 1
 val_batch_size = 10
 CROP_SIZE = 256
+augment_pipe = [affine_transform(points=20, distort=3), random_flip(),
+                random_rotate(), random_illum(perc=0.25)]
 
 
-def define_callbacks(output, batch_size):
+def define_callbacks(output):
     csv_logger = callbacks.CSVLogger(join(output, 'training.log'))
-    earlystop = callbacks.EarlyStopping(monitor='val_loss', patience=2)
-    fpath = join(output, 'weights.{epoch:02d}-{loss:.2f}-{acc:.2f}-{val_loss:.2f}-{val_acc:.2f}.hdf5')
-    cp_cb = callbacks.ModelCheckpoint(filepath=fpath, monitor='val_loss', save_best_only=True)
-    return [csv_logger, earlystop, cp_cb]
-
-
-def conv_labels2dto3d(labels):
-    lbnums = np.unique(labels)
-    arr = np.zeros((labels.shape[0], labels.shape[1], len(lbnums)), np.uint8)
-    for i in lbnums:
-        arr[:, :, i] = labels == i
-    return arr
-
-
-def normalize(orig_img):
-    # normalize to [0,1]
-    percentile = 99.9
-    high = np.percentile(orig_img, percentile)
-    low = np.percentile(orig_img, 100-percentile)
-
-    img = np.minimum(high, orig_img)
-    img = np.maximum(low, img)
-
-    img = (img - low) / (high - low) # gives float64, thus cast to 8 bit later
-    # img = skimage.img_as_ubyte(img)
-    return img
-
+    # earlystop = callbacks.EarlyStopping(monitor='loss', patience=2)
+    fpath = join(output, 'weights.{epoch:02d}-{loss:.2f}-{categorical_accuracy:.2f}.hdf5')
+    cp_cb = callbacks.ModelCheckpoint(filepath=fpath, monitor='loss', save_best_only=True)
+    return [csv_logger, cp_cb]
 
 
 def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10000,
@@ -65,16 +45,14 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
 
     model = utils.model_builder.get_model_3_class(CROP_SIZE, CROP_SIZE, activation=None)
     loss = weighted_crossentropy
-
     metrics = [keras.metrics.categorical_accuracy,
-            utils.metrics.channel_recall(channel=0, name="background_recall"),
-            utils.metrics.channel_precision(channel=0, name="background_precision"),
-            utils.metrics.channel_recall(channel=1, name="interior_recall"),
-            utils.metrics.channel_precision(channel=1, name="interior_precision"),
-            utils.metrics.channel_recall(channel=2, name="boundary_recall"),
-            utils.metrics.channel_precision(channel=2, name="boundary_precision"),
-            ]
-
+               utils.metrics.channel_recall(channel=0, name="background_recall"),
+               utils.metrics.channel_precision(channel=0, name="background_precision"),
+               utils.metrics.channel_recall(channel=1, name="interior_recall"),
+               utils.metrics.channel_precision(channel=1, name="interior_precision"),
+               utils.metrics.channel_recall(channel=2, name="boundary_recall"),
+               utils.metrics.channel_precision(channel=2, name="boundary_precision"),
+               ]
     optimizer = keras.optimizers.RMSprop(lr=1e-4)
     model.compile(loss=loss, metrics=metrics, optimizer=optimizer)
     model.summary()
@@ -92,32 +70,28 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
 
     num_tests = int(nsamples * FRAC_TEST)
     ecoords = pick_coords_list(nsamples, li_labels, patchsize, patchsize)
-
     li_labels = [conv_labels2dto3d(lb) for lb in li_labels]
-
-    ecoords_tests, ecoords_train = ecoords[:num_tests], ecoords[num_tests:],
+    ecoords_tests, ecoords_train = ecoords[:num_tests], ecoords[num_tests:]
     x_tests, y_tests = extract_patch_list(li_image, li_labels, ecoords_tests, patchsize, patchsize)
 
     make_outputdir(output)
-    callbacks = define_callbacks(output, batch_size=64)
+    callbacks = define_callbacks(output)
 
-    datagen = PatchDataGeneratorList(rotation_range=90, shear_range=0,
-                                     horizontal_flip=True, vertical_flip=True)
+    datagen = PatchDataGeneratorList(augment_pipe)
 
     history = model.fit_generator(
         generator=datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
         steps_per_epoch=STEPS_PER_EPOCH,
         epochs=nepochs,
         validation_data=(x_tests, y_tests),
-        validation_steps=len(ecoords_train)/batch_size,
+        # validation_steps=len(ecoords_train)/batch_size,
+        validation_steps=len(ecoords_train),
         callbacks=callbacks,
-        verbose = 1
+        verbose=1
     )
 
-    score = model.evaluate(x_tests, y_tests, batch_size=batch_size)
-    print('score[loss, accuracy]:', score)
-    rec = dict(acc=history.history['acc'], val_acc=history.history['val_acc'],
-               loss=history.history['loss'], val_loss=history.history['val_loss'])
+    # score = model.evaluate(x_tests, y_tests, batch_size=batch_size)
+    rec = dict(zip(model.metrics_names, [history.history[i] for i in model.metrics_names]))
     np.savez(join(output, 'records.npz'), **rec)
 
     json_string = model.to_json()

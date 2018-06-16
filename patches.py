@@ -1,10 +1,12 @@
 from __future__ import division
 import numpy as np
 import os
-
 from keras.preprocessing.image import ImageDataGenerator, Iterator, array_to_img
 from keras import backend as K
+from utils.augmentation import deform
 
+
+POINTS, DISTORT = 20, 5
 
 def _sample_coords_weighted(num, shape, weights):
     flat_idx = np.arange(shape[0] * shape[1])
@@ -121,10 +123,12 @@ class PatchDataGenerator(ImageDataGenerator):
 class CropIterator(Iterator):
     def __init__(self, x, y, image_data_generator, coords, patch_h, patch_w,
                  batch_size=32, shuffle=False, seed=None, func_patch=_extract_patches,
-                 data_format=None, save_to_dir=None, save_prefix='', save_format='png'):
+                 data_format=None, save_to_dir=None, save_prefix='',
+                 save_format='png', aug_pipeline=()):
         self.coords = coords
         self.patch_h = patch_h
         self.patch_w = patch_w
+        self.aug_pipeline = aug_pipeline
         if isinstance(x, list):
             self._x, self._y = x[:], y[:]
             chnum = self._x[0].shape[-1]
@@ -134,7 +138,7 @@ class CropIterator(Iterator):
             chnum = self._x.shape[-1]
         self.x = np.asarray(np.zeros((1, patch_h, patch_w, chnum)), dtype=K.floatx())
         if y is not None:
-            self.y = np.zeros(1)
+            self.y = np.asarray(np.zeros((1, patch_h, patch_w, self._y[0].shape[-1])), dtype=K.floatx())
         else:
             self.y = None
         self.n = len(self.coords)
@@ -149,6 +153,8 @@ class CropIterator(Iterator):
 
     def _get_batches_of_transformed_samples(self, index_array):
         batch_x = np.zeros(tuple([len(index_array)] + list(self.x.shape)[1:]), dtype=K.floatx())
+        batch_y = np.zeros(tuple([len(index_array)] + list(self.y.shape)[1:]), dtype=K.floatx())
+
         batch_coords = [self.coords[i] for i in index_array]
         x, y = self.func_patch(self._x, self._y, batch_coords, self.patch_h, self.patch_w)
         # y = np.expand_dims(y, -1)
@@ -158,18 +164,19 @@ class CropIterator(Iterator):
 
         for i, j in enumerate(index_array):
             x = self.x[j]
-            x = self.image_data_generator.random_transform(x.astype(K.floatx()))
-            x = self.image_data_generator.standardize(x)
+            y = self.y[j]
+
+            for aug in self.aug_pipeline:
+                x, y = aug(x, y)
             batch_x[i] = x
+            batch_y[i] = y
+
         if self.save_to_dir:
             for i, j in enumerate(index_array):
                 img = array_to_img(batch_x[i], self.data_format, scale=True)
                 fname = '{prefix}_{index}_{hash}.{format}'.format(prefix=self.save_prefix, index=j,
                 hash=np.random.randint(1e4), format=self.save_format)
             img.save(os.path.join(self.save_to_dir, fname))
-        if self.y is None:
-            return batch_x
-        batch_y = self.y[index_array]
         return batch_x, batch_y
 
     def next(self):
@@ -181,13 +188,12 @@ class CropIterator(Iterator):
 
 
 class PatchDataGeneratorList(ImageDataGenerator):
-    def flow(self, x, y, coords, patch_h, patch_w, batch_size=32, shuffle=True, seed=None,
+    def flow(self, x, y, coords, patch_h, patch_w, aug_pipeline=(), batch_size=32, shuffle=True, seed=None,
              save_to_dir=None, save_prefix='', save_format='png'):
-        # import ipdb;ipdb.set_trace()
-        # x = [i[0] for i in x]
         return CropIterator(
             x, y, self, coords=coords, patch_h=patch_h, patch_w=patch_w,
             batch_size=batch_size, shuffle=shuffle, seed=seed,
             data_format=self.data_format, func_patch=extract_patch_list,
-            save_to_dir=save_to_dir, save_prefix=save_prefix, save_format=save_format)
+            save_to_dir=save_to_dir, save_prefix=save_prefix,
+            save_format=save_format, aug_pipeline=aug_pipeline)
 
