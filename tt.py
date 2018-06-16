@@ -38,7 +38,7 @@ def define_callbacks(output):
 
 
 def train(image_list, labels_list, output, patchsize=256, nsteps=100,
-          batch_size=12, nepochs=10):
+          batch_size=16, nepochs=10):
 
     model = utils.model_builder.get_model_3_class(patchsize, patchsize, activation=None)
     loss = weighted_crossentropy
