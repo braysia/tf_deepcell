@@ -1,6 +1,6 @@
 """
 keras==2.0.0, 2.2 not working
-
+add weight argument to continue training?
 """
 
 from __future__ import division, print_function
@@ -25,9 +25,7 @@ from on_the_fly import affine_transform, random_flip, random_rotate, random_illu
 
 
 FRAC_TEST = 0.1
-STEPS_PER_EPOCH = 1
 val_batch_size = 10
-CROP_SIZE = 256
 augment_pipe = [affine_transform(points=20, distort=3), random_flip(),
                 random_rotate(), random_illum(perc=0.25)]
 
@@ -40,10 +38,10 @@ def define_callbacks(output):
     return [csv_logger, cp_cb]
 
 
-def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10000,
-          batch_size=32, nepochs=100, frac_test=FRAC_TEST):
+def train(image_list, labels_list, output, patchsize=256, nsamples=6400,
+          batch_size=64, nepochs=10, frac_test=FRAC_TEST):
 
-    model = utils.model_builder.get_model_3_class(CROP_SIZE, CROP_SIZE, activation=None)
+    model = utils.model_builder.get_model_3_class(patchsize, patchsize, activation=None)
     loss = weighted_crossentropy
     metrics = [keras.metrics.categorical_accuracy,
                utils.metrics.channel_recall(channel=0, name="background_recall"),
@@ -81,7 +79,7 @@ def train(image_list, labels_list, model_path, output, patchsize=61, nsamples=10
 
     history = model.fit_generator(
         generator=datagen.flow(li_image, li_labels, ecoords_train, patchsize, patchsize, batch_size=batch_size, shuffle=True),
-        steps_per_epoch=STEPS_PER_EPOCH,
+        steps_per_epoch=int(nsamples/batch_size),
         epochs=nepochs,
         validation_data=(x_tests, y_tests),
         # validation_steps=len(ecoords_train)/batch_size,
@@ -118,9 +116,8 @@ def _parse_command_line_args():
     parser = argparse.ArgumentParser(description='predict')
     parser.add_argument('-i', '--image', help='image file path', nargs="*")
     parser.add_argument('-l', '--labels', help='labels file path', nargs="*")
-    parser.add_argument('-m', '--model', help='path to python file or hdf5')
     parser.add_argument('-o', '--output', default='.', help='output directory')
-    parser.add_argument('-n', '--nsamples', type=int, default=10000, help='number of samples')
+    parser.add_argument('-n', '--nsamples', type=int, default=100, help='number of samples')
     parser.add_argument('-b', '--batch', type=int, default=64)
     parser.add_argument('-e', '--epoch', type=int, default=50)
     parser.add_argument('-p', '--patch', type=int, default=61,
@@ -132,7 +129,7 @@ def _main():
     args = _parse_command_line_args()
     images = parse_image_files(args.image)[0]
     labels = parse_image_files(args.labels)[0]
-    train(images, labels, args.model, args.output, args.patch,
+    train(images, labels, args.output, args.patch,
           args.nsamples, args.batch, args.epoch)
 
 
