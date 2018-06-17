@@ -1,4 +1,5 @@
 """
+image needs to be a size divisible by 8. remove pixels or pad?
 keras==2.0.0, 2.2 not working
 add weight argument to continue training?
 """
@@ -25,7 +26,7 @@ from on_the_fly import affine_transform, random_flip, random_rotate, random_illu
 
 
 FRAC_TEST = 0.1
-augment_pipe = [affine_transform(points=20, distort=3), random_flip(),
+augment_pipe = [affine_transform(points=10, distort=2), random_flip(),
                 random_rotate(), random_illum(perc=0.25)]
 
 
@@ -38,21 +39,7 @@ def define_callbacks(output):
 
 
 def train(image_list, labels_list, output, patchsize=256, nsteps=100,
-          batch_size=16, nepochs=10):
-
-    model = utils.model_builder.get_model_3_class(patchsize, patchsize, activation=None)
-    loss = weighted_crossentropy
-    metrics = [keras.metrics.categorical_accuracy,
-               utils.metrics.channel_recall(channel=0, name="background_recall"),
-               utils.metrics.channel_precision(channel=0, name="background_precision"),
-               utils.metrics.channel_recall(channel=1, name="interior_recall"),
-               utils.metrics.channel_precision(channel=1, name="interior_precision"),
-               utils.metrics.channel_recall(channel=2, name="boundary_recall"),
-               utils.metrics.channel_precision(channel=2, name="boundary_precision"),
-               ]
-    optimizer = keras.optimizers.RMSprop(lr=1e-4)
-    model.compile(loss=loss, metrics=metrics, optimizer=optimizer)
-    # model.summary()
+          batch_size=16, nepochs=10, weights=None):
 
     li_image, li_labels = [], []
     for image_path, labels_path in zip(image_list, labels_list):
@@ -70,6 +57,22 @@ def train(image_list, labels_list, output, patchsize=256, nsteps=100,
     li_labels = [conv_labels2dto3d(lb) for lb in li_labels]
     ecoords_tests, ecoords_train = ecoords[:num_tests], ecoords[num_tests:]
     x_tests, y_tests = extract_patch_list(li_image, li_labels, ecoords_tests, patchsize, patchsize)
+
+    model = utils.model_builder.get_model_3_class(patchsize, patchsize, activation=None)
+    loss = weighted_crossentropy
+    metrics = [keras.metrics.categorical_accuracy,
+               utils.metrics.channel_recall(channel=0, name="background_recall"),
+               utils.metrics.channel_precision(channel=0, name="background_precision"),
+               utils.metrics.channel_recall(channel=1, name="interior_recall"),
+               utils.metrics.channel_precision(channel=1, name="interior_precision"),
+               utils.metrics.channel_recall(channel=2, name="boundary_recall"),
+               utils.metrics.channel_precision(channel=2, name="boundary_precision"),
+               ]
+    if weights is not None:
+        model.load_weights(weights)
+    optimizer = keras.optimizers.RMSprop(lr=1e-4)
+    model.compile(loss=loss, metrics=metrics, optimizer=optimizer)
+    # model.summary()
 
     make_outputdir(output)
     callbacks = define_callbacks(output)
@@ -118,7 +121,8 @@ def _parse_command_line_args():
     parser.add_argument('-b', '--batch', type=int, default=16)
     parser.add_argument('-e', '--epoch', type=int, default=50)
     parser.add_argument('-p', '--patch', type=int, default=256,
-                        help='pixel size of image patches. make it even')
+                        help='pixel size of image patches. make it divisible by 8')
+    parser.add_argument('-w', '--weights', help='hdf5 weight file path', nargs="*")
     return parser.parse_args()
 
 
@@ -127,7 +131,7 @@ def _main():
     images = parse_image_files(args.image)[0]
     labels = parse_image_files(args.labels)[0]
     train(images, labels, args.output, args.patch,
-          args.nsteps, args.batch, args.epoch)
+          args.nsteps, args.batch, args.epoch, args.weights)
 
 
 if __name__ == "__main__":
